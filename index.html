@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find the Key</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #1C1512;
+    --ink-soft: #2A211C;
+    --panel: #2F2620;
+    --panel-line: #4A3B30;
+    --ivory: #FBF7EE;
+    --ivory-dim: #C9BFAF;
+    --brass: #C9A227;
+    --brass-dim: #8A7220;
+    --ebony: #14100D;
+    --highlight: #3B6FE0;
+    --good: #4C8C3B;
+    --bad: #B04A3C;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    font-family:'Inter', sans-serif;
+    background: var(--ink);
+    background-image:
+      radial-gradient(ellipse at 15% 0%, rgba(201,162,39,0.07), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(201,162,39,0.05), transparent 50%);
+    color: var(--ivory);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+  }
+  #app{ width:100%; max-width: 640px; }
+  .screen{ display:none; }
+  .screen.active{ display:block; animation: rise .45s cubic-bezier(.2,.7,.3,1); }
+  @keyframes rise{ from{ opacity:0; transform: translateY(14px); } to{ opacity:1; transform:none; } }
+
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 2.4rem;
+    letter-spacing: -0.01em;
+    color: var(--ivory);
+  }
+  .subtitle{
+    color: var(--ivory-dim);
+    font-size: 1rem;
+    margin-top: 8px;
+    line-height:1.5;
+  }
+  .home-header{ margin-bottom: 32px; }
+
+  .level-list{ display:flex; flex-direction:column; gap: 10px; }
+  .level-row{
+    display:flex;
+    align-items:center;
+    gap: 16px;
+    width:100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    cursor:pointer;
+    text-align:left;
+    color: var(--ivory);
+    font-family:'Inter', sans-serif;
+    transition: border-color .2s ease, background .2s ease, transform .15s ease;
+  }
+  .level-row:hover{ border-color: var(--brass-dim); background:#382C24; transform: translateY(-1px); }
+  .level-row:active{ transform: translateY(0); }
+  .level-num{
+    font-family:'Fraunces', serif;
+    font-size: 1.5rem;
+    font-weight:600;
+    color: var(--brass);
+    width: 34px;
+    flex-shrink:0;
+    text-align:center;
+  }
+  .level-goal{ flex:1; font-size: 1rem; color: var(--ivory-dim); }
+
+  /* Game screen */
+  .game-topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: 28px;
+  }
+  .text-btn{
+    background:none;
+    border:none;
+    color: var(--ivory-dim);
+    font-family:'Inter', sans-serif;
+    font-size: 0.9rem;
+    cursor:pointer;
+    padding: 6px 0;
+  }
+  .text-btn:hover{ color: var(--ivory); }
+  .game-status{
+    display:flex;
+    align-items:baseline;
+    gap: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-item{ text-align:right; }
+  .status-value{ font-family:'Fraunces', serif; font-size:1.3rem; font-weight:600; color: var(--brass); }
+  .status-label{ font-size: 0.72rem; color: var(--ivory-dim); display:block; margin-top:1px; }
+  #timer-item.low .status-value{ color: var(--bad); }
+
+  #piano-wrap{
+    display:flex;
+    justify-content:center;
+    margin: 8px 0 34px;
+    overflow-x:auto;
+  }
+  #piano{
+    position:relative;
+    width: 392px;
+    max-width: 100%;
+    height: 190px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: linear-gradient(180deg, var(--panel) 0%, var(--ink-soft) 100%);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    transition: background .18s ease;
+  }
+  #piano.flash-good{ background: var(--good); }
+  #piano.flash-bad{ background: var(--bad); }
+
+  #piano-keys{ position:relative; }
+
+  .pkey{ position:absolute; top:0; border-radius: 0 0 6px 6px; box-sizing:border-box; transition: box-shadow .15s ease; }
+  .pkey.white{
+    width: 48px; height:150px;
+    background: linear-gradient(180deg, var(--ivory) 0%, #EFE8D8 100%);
+    border: 1px solid #B9AF9C;
+    z-index:1;
+  }
+  .pkey.black{
+    width: 28px; height: 92px;
+    background: linear-gradient(180deg, #2A231D 0%, var(--ebony) 100%);
+    border: 1px solid #000;
+    z-index:2;
+  }
+  .pkey.white.highlighted{
+    background: linear-gradient(180deg, var(--highlight) 0%, #2C57B8 100%);
+    box-shadow: 0 0 0 2px rgba(59,111,224,0.35), 0 6px 18px rgba(59,111,224,0.5);
+  }
+
+  #letter-buttons{
+    display:flex;
+    justify-content:center;
+    gap: 10px;
+    flex-wrap:wrap;
+  }
+  .letter-btn{
+    width: 52px; height: 52px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--ivory);
+    font-family:'Fraunces', serif;
+    font-size: 1.2rem;
+    font-weight:600;
+    cursor:pointer;
+    transition: transform .12s ease, border-color .15s ease, background .15s ease;
+  }
+  .letter-btn:hover:not(:disabled){ border-color: var(--brass-dim); }
+  .letter-btn:active:not(:disabled){ transform: scale(0.94); }
+  .letter-btn:disabled{ cursor:default; opacity:0.55; }
+
+  /* Success / timeout screens */
+  .result-screen{ text-align:center; padding: 40px 10px; }
+  .result-screen h1{ font-size: 2.3rem; }
+  .result-screen p{ color: var(--ivory-dim); margin-top: 12px; font-size: 1.02rem; }
+  .result-actions{ margin-top: 30px; display:flex; gap: 12px; justify-content:center; flex-wrap:wrap; }
+  .primary-btn, .ghost-btn{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size: 0.95rem;
+    padding: 13px 24px;
+    border-radius: 9px;
+    cursor:pointer;
+    border: none;
+  }
+  .primary-btn{ background: var(--brass); color: var(--ink); }
+  .primary-btn:hover{ background:#DDB233; }
+  .ghost-btn{ background:transparent; color: var(--ivory-dim); border: 1px solid var(--panel-line); }
+  .ghost-btn:hover{ color: var(--ivory); border-color: var(--brass-dim); }
+
+  @media (prefers-reduced-motion: reduce){
+    .screen.active{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="screen-home" class="screen active">
+    <div class="home-header">
+      <h1>Find the Key</h1>
+      <p class="subtitle">A key lights up on the keyboard. Name it before the streak breaks.</p>
+    </div>
+    <div class="level-list">
+      <button class="level-row" data-level="1">
+        <span class="level-num">1</span>
+        <span class="level-goal">7 in a row</span>
+      </button>
+      <button class="level-row" data-level="2">
+        <span class="level-num">2</span>
+        <span class="level-goal">14 in a row</span>
+      </button>
+      <button class="level-row" data-level="3">
+        <span class="level-num">3</span>
+        <span class="level-goal">21 in a row</span>
+      </button>
+      <button class="level-row" data-level="4">
+        <span class="level-num">4</span>
+        <span class="level-goal">21 in a row, full octaves</span>
+      </button>
+      <button class="level-row" data-level="5">
+        <span class="level-num">5</span>
+        <span class="level-goal">21 in a row under 60 seconds</span>
+      </button>
+    </div>
+  </section>
+
+  <section id="screen-game" class="screen">
+    <div class="game-topbar">
+      <button class="text-btn" id="quit-btn">&larr; Back to levels</button>
+      <div class="game-status">
+        <div class="status-item">
+          <span class="status-value" id="streak-display">0 / 7</span>
+          <span class="status-label">in a row</span>
+        </div>
+        <div class="status-item" id="timer-item" style="display:none;">
+          <span class="status-value" id="timer-display">60</span>
+          <span class="status-label">seconds</span>
+        </div>
+      </div>
+    </div>
+    <div id="piano-wrap">
+      <div id="piano"><div id="piano-keys"></div></div>
+    </div>
+    <div id="letter-buttons"></div>
+  </section>
+
+  <section id="screen-success" class="screen">
+    <div class="result-screen">
+      <h1>Congratulations!</h1>
+      <p id="success-detail"></p>
+      <div class="result-actions">
+        <button class="primary-btn" id="success-home-btn">Back to levels</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-timeout" class="screen">
+    <div class="result-screen">
+      <h1>Time&rsquo;s up</h1>
+      <p id="timeout-detail"></p>
+      <div class="result-actions">
+        <button class="primary-btn" id="retry-btn">Try again</button>
+        <button class="ghost-btn" id="timeout-home-btn">Back to levels</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Chromatic key reference, C4 through E5 ----
+  var KEYS = [
+    { note:'C4', letter:'C', type:'white' },
+    { note:'C#4', letter:null, type:'black' },
+    { note:'D4', letter:'D', type:'white' },
+    { note:'D#4', letter:null, type:'black' },
+    { note:'E4', letter:'E', type:'white' },
+    { note:'F4', letter:'F', type:'white' },
+    { note:'F#4', letter:null, type:'black' },
+    { note:'G4', letter:'G', type:'white' },
+    { note:'G#4', letter:null, type:'black' },
+    { note:'A4', letter:'A', type:'white' },
+    { note:'A#4', letter:null, type:'black' },
+    { note:'B4', letter:'B', type:'white' },
+    { note:'C5', letter:'C', type:'white' },
+    { note:'C#5', letter:null, type:'black' },
+    { note:'D5', letter:'D', type:'white' },
+    { note:'D#5', letter:null, type:'black' },
+    { note:'E5', letter:'E', type:'white' }
+  ];
+
+  var FREQ = {
+    'C4':261.63,'C#4':277.18,'D4':293.66,'D#4':311.13,'E4':329.63,
+    'F4':349.23,'F#4':369.99,'G4':392.00,'G#4':415.30,'A4':440.00,
+    'A#4':466.16,'B4':493.88,'C5':523.25,'C#5':554.37,'D5':587.33,
+    'D#5':622.25,'E5':659.25
+  };
+
+  // Segment index ranges into KEYS (inclusive)
+  var SEGMENTS = {
+    "C":  [0, 4],   // C4-E4
+    "F":  [5, 11],  // F4-B4
+    "C'": [0, 11],  // C4-B4
+    "F'": [5, 16]   // F4-E5
+  };
+
+  var LETTERS = ['A','B','C','D','E','F','G'];
+  var LEVEL_STREAK = { 1:7, 2:14, 3:21, 4:21, 5:21 };
+
+  // ---- Audio ----
+  var audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+  }
+  function playTone(freq, duration){
+    if(!audioCtx) return;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+  document.addEventListener('click', function initAudioOnce(){
+    ensureAudio();
+    document.removeEventListener('click', initAudioOnce);
+  });
+
+  // ---- State ----
+  var state = {
+    level: 1,
+    letterOrder: [],
+    qIndex: 0,
+    streak: 0,
+    required: 7,
+    segmentMode: 'letterBased', // 'letterBased' | 'alternating'
+    inputLocked: false,
+    timerId: null,
+    timeLeft: 60
+  };
+
+  // ---- Helpers ----
+  function shuffledLetters(){
+    var arr = LETTERS.slice();
+    for(var i = arr.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  }
+
+  function layoutSegment(range){
+    var slice = KEYS.slice(range[0], range[1] + 1);
+    var whiteX = 0, lastWhiteX = 0;
+    var laid = slice.map(function(k){
+      if(k.type === 'white'){
+        var pos = whiteX;
+        lastWhiteX = whiteX;
+        whiteX += 50;
+        return { note:k.note, letter:k.letter, type:k.type, pos:pos };
+      } else {
+        return { note:k.note, letter:k.letter, type:k.type, pos: lastWhiteX + 35 };
+      }
+    });
+    return { keys: laid, width: whiteX - 2 };
+  }
+
+  function currentSegmentName(){
+    var letter = state.letterOrder[state.qIndex % 7];
+    if(state.segmentMode === 'letterBased'){
+      return (letter === 'C' || letter === 'D' || letter === 'E') ? 'C' : 'F';
+    }
+    // alternating, starts on C'
+    return (state.qIndex % 2 === 0) ? "C'" : "F'";
+  }
+
+  function currentLetter(){
+    return state.letterOrder[state.qIndex % 7];
+  }
+
+  // ---- Rendering ----
+  function renderQuestion(){
+    var segName = currentSegmentName();
+    var letter = currentLetter();
+    var layout = layoutSegment(SEGMENTS[segName]);
+
+    var keysCanvas = document.getElementById('piano-keys');
+    keysCanvas.innerHTML = '';
+    keysCanvas.style.width = layout.width + 'px';
+    keysCanvas.style.height = '150px';
+
+    // draw white keys first, then black keys on top
+    var whites = layout.keys.filter(function(k){ return k.type === 'white'; });
+    var blacks = layout.keys.filter(function(k){ return k.type === 'black'; });
+
+    whites.concat(blacks).forEach(function(k){
+      var el = document.createElement('div');
+      el.className = 'pkey ' + k.type;
+      el.style.left = k.pos + 'px';
+      if(k.letter === letter){
+        el.classList.add('highlighted');
+        el.dataset.targetKey = '1';
+      }
+      keysCanvas.appendChild(el);
+    });
+
+    document.getElementById('streak-display').textContent = state.streak + ' / ' + state.required;
+  }
+
+  function renderLetterButtons(){
+    var wrap = document.getElementById('letter-buttons');
+    wrap.innerHTML = '';
+    LETTERS.forEach(function(letter){
+      var btn = document.createElement('button');
+      btn.className = 'letter-btn';
+      btn.textContent = letter;
+      btn.addEventListener('click', function(){ handleAnswer(letter); });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function setButtonsDisabled(disabled){
+    document.querySelectorAll('.letter-btn').forEach(function(b){ b.disabled = disabled; });
+  }
+
+  function flashPiano(kind, callback){
+    var piano = document.getElementById('piano');
+    piano.classList.add(kind === 'good' ? 'flash-good' : 'flash-bad');
+    setTimeout(function(){
+      piano.classList.remove('flash-good', 'flash-bad');
+      callback();
+    }, 500);
+  }
+
+  // ---- Game flow ----
+  function startLevel(level){
+    ensureAudio();
+    state.level = level;
+    state.letterOrder = shuffledLetters();
+    state.qIndex = 0;
+    state.streak = 0;
+    state.required = LEVEL_STREAK[level];
+    state.segmentMode = (level >= 4) ? 'alternating' : 'letterBased';
+    state.inputLocked = false;
+
+    var timerItem = document.getElementById('timer-item');
+    if(level === 5){
+      timerItem.style.display = '';
+      state.timeLeft = 60;
+      document.getElementById('timer-display').textContent = state.timeLeft;
+      timerItem.classList.remove('low');
+      if(state.timerId) clearInterval(state.timerId);
+      state.timerId = setInterval(tickTimer, 1000);
+    } else {
+      timerItem.style.display = 'none';
+      if(state.timerId){ clearInterval(state.timerId); state.timerId = null; }
+    }
+
+    renderLetterButtons();
+    renderQuestion();
+    showScreen('screen-game');
+  }
+
+  function tickTimer(){
+    state.timeLeft -= 1;
+    document.getElementById('timer-display').textContent = state.timeLeft;
+    if(state.timeLeft <= 10){
+      document.getElementById('timer-item').classList.add('low');
+    }
+    if(state.timeLeft <= 0){
+      clearInterval(state.timerId);
+      state.timerId = null;
+      endInTimeout();
+    }
+  }
+
+  function handleAnswer(letter){
+    if(state.inputLocked) return;
+    state.inputLocked = true;
+    setButtonsDisabled(true);
+
+    var expected = currentLetter();
+    var correct = (letter === expected);
+    var expectedNote = null;
+    var layout = layoutSegment(SEGMENTS[currentSegmentName()]);
+    layout.keys.forEach(function(k){ if(k.letter === expected) expectedNote = k.note; });
+
+    if(correct){
+      state.streak += 1;
+      playTone(FREQ[expectedNote] || 440, 0.28);
+    } else {
+      state.streak = 0;
+      playTone(180, 0.28);
+    }
+
+    document.getElementById('streak-display').textContent = Math.min(state.streak, state.required) + ' / ' + state.required;
+
+    flashPiano(correct ? 'good' : 'bad', function(){
+      if(correct && state.streak >= state.required){
+        endInSuccess();
+        return;
+      }
+      state.qIndex += 1;
+      state.inputLocked = false;
+      setButtonsDisabled(false);
+      renderQuestion();
+    });
+  }
+
+  function endInSuccess(){
+    if(state.timerId){ clearInterval(state.timerId); state.timerId = null; }
+    var detail = document.getElementById('success-detail');
+    detail.textContent = 'You named ' + state.required + ' keys in a row on level ' + state.level + '.';
+    showScreen('screen-success');
+  }
+
+  function endInTimeout(){
+    state.inputLocked = true;
+    setButtonsDisabled(true);
+    var detail = document.getElementById('timeout-detail');
+    detail.textContent = 'You reached a streak of ' + state.streak + ' out of ' + state.required + ' before time ran out.';
+    showScreen('screen-timeout');
+  }
+
+  // ---- Wiring ----
+  document.querySelectorAll('.level-row').forEach(function(row){
+    row.addEventListener('click', function(){
+      var level = parseInt(row.dataset.level, 10);
+      startLevel(level);
+    });
+  });
+
+  document.getElementById('quit-btn').addEventListener('click', function(){
+    if(state.timerId){ clearInterval(state.timerId); state.timerId = null; }
+    showScreen('screen-home');
+  });
+
+  document.getElementById('success-home-btn').addEventListener('click', function(){
+    showScreen('screen-home');
+  });
+
+  document.getElementById('retry-btn').addEventListener('click', function(){
+    startLevel(state.level);
+  });
+
+  document.getElementById('timeout-home-btn').addEventListener('click', function(){
+    showScreen('screen-home');
+  });
+
+})();
+</script>
+</body>
+</html>
